@@ -1,0 +1,49 @@
+﻿version: "3.9"
+
+services:
+  db:
+    image: mysql:8.4
+    container_name: bot-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: botdb
+      MYSQL_USER: botuser
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-botpass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"  # только для отладки, в проде убрать
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    networks:
+      - botnet
+
+  bot:
+    build:
+      context: .
+      dockerfile: ActivityCountBot/Dockerfile
+    container_name: bot-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy  # бот стартует ТОЛЬКО после готовности MySQL
+    environment:
+      # Строка подключения через переменные окружения
+      ConnectionStrings__BotDb: "Server=db;Port=3306;Database=botdb;User=botuser;Password=${MYSQL_PASSWORD:-botpass};SslMode=Disabled;"
+      BotSettings__Token: ${BOT_TOKEN}
+      # Таймзона (важно для корректного sent_at)
+      TZ: UTC
+    networks:
+      - botnet
+
+volumes:
+  mysql_data:
+
+networks:
+  botnet:
