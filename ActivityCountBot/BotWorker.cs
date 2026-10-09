@@ -40,11 +40,24 @@ public class BotWorker : BackgroundService
             DropPendingUpdates = true
         };
 
+        //Task.Run(async () => await SendMessageActivityDaily(stoppingToken), stoppingToken);
+
         await _bot.ReceiveAsync(
             updateHandler: new UpdateHandler(_handler, _logger),
             receiverOptions: receiverOptions,
             cancellationToken: stoppingToken);
     }
+
+    /*private async Task SendMessageActivityDaily(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(
+                new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day + 1) - DateTime.UtcNow,
+                ct);
+            
+        }
+    }*/
 }
 
 public class UpdateHandler : IUpdateHandler

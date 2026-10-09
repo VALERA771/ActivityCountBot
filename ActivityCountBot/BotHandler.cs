@@ -43,12 +43,17 @@ public class BotHandler
 
     private async Task HandleMessageAsync(Message message, CancellationToken cancellationToken)
     {
-        // Игнорируем сообщения не из групп
         if (message.Chat.Type is not (ChatType.Group or ChatType.Supergroup))
             return;
 
         if (message.From is not { } user)
             return;
+        
+        if (message.Text?.StartsWith("/stats") == true)
+        {
+            await HandleStatsCommandAsync(message, user, cancellationToken);
+            return;
+        }
 
         await _repository.EnqueueAsync(new MessageEntry
         {
@@ -57,40 +62,26 @@ public class BotHandler
             Username = user.Username,
             SentAt = message.Date.ToUniversalTime()
         }, cancellationToken);
-
-        
-
-        // 2. Если это команда /stats — отвечаем
-        /*if (message.Text?.StartsWith("/stats") == true)
-        {
-            await HandleStatsCommandAsync(message, user, db, cancellationToken);
-        }*/
     }
 
-    /*private async Task HandleStatsCommandAsync(
+    private async Task HandleStatsCommandAsync(
         Message message, 
         User user, 
-        AppDbContext db, 
         CancellationToken cancellationToken)
     {
         var period = ParsePeriod(message.Text);
-        var since = DateTime.UtcNow - period;
 
-        var count = await db.Messages
-            .Where(m => m.ChatId == message.Chat.Id 
-                     && m.UserId == user.Id 
-                     && m.SentAt >= since)
-            .CountAsync(cancellationToken);
+        var count = await _repository.CountAsync(message.Chat.Id, user.Id, period, cancellationToken);
 
         var periodText = FormatPeriod(period);
         var userName = user.Username is not null ? $"@{user.Username}" : user.FirstName;
 
-        await _bot.SendTextMessageAsync(
+        await _bot.SendMessage(
             chatId: message.Chat.Id,
             text: $"{userName}, за последние {periodText} ты написал {count} сообщений.",
-            replyToMessageId: message.MessageId,
+            replyParameters: new() { MessageId = message.MessageId, ChatId = message.Chat.Id },
             cancellationToken: cancellationToken);
-    }*/
+    }
 
     private static TimeSpan ParsePeriod(string? text)
     {

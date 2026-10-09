@@ -22,7 +22,6 @@ public class MessageRepository : IHostedService, IDisposable
         _scopeFactory = scopeFactory;
         _logger = logger;
 
-        // Ограниченный канал: если БД не успевает — дропаем самые старые
         _channel = Channel.CreateBounded<MessageEntry>(
             new BoundedChannelOptions(10_000)
             {
@@ -34,13 +33,11 @@ public class MessageRepository : IHostedService, IDisposable
         _consumerTask = Task.Run(() => ConsumeLoop(_cts.Token));
     }
 
-    // === Запись (неблокирующая) ===
     public async ValueTask EnqueueAsync(MessageEntry message, CancellationToken ct = default)
     {
         await _channel.Writer.WriteAsync(message, ct);
     }
 
-    // === Чтение (для /stats) ===
     public async Task<int> CountAsync(long chatId, long userId, TimeSpan period, CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -52,7 +49,6 @@ public class MessageRepository : IHostedService, IDisposable
             .CountAsync(ct);
     }
 
-    // === Фоновый consumer: батчим записи в БД ===
     private async Task ConsumeLoop(CancellationToken ct)
     {
         var batch = new List<MessageEntry>(500);
@@ -93,11 +89,9 @@ public class MessageRepository : IHostedService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to flush batch of {Count} messages", batch.Count);
-            // Опционально: вернуть в канал или записать в dead-letter
         }
     }
 
-    // === IHostedService: graceful shutdown ===
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -107,7 +101,6 @@ public class MessageRepository : IHostedService, IDisposable
 
         try
         {
-            // Даём время дочитать оставшееся
             await _consumerTask.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
         catch (TimeoutException)
@@ -118,7 +111,13 @@ public class MessageRepository : IHostedService, IDisposable
 
     public void Dispose()
     {
-        _cts.Cancel();
-        _cts.Dispose();
+        GC.SuppressFinalize(this);
+        
+        try
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+        }
+        catch (ObjectDisposedException) { }
     }
 }

@@ -8,13 +8,13 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
       MYSQL_DATABASE: botdb
-      MYSQL_USER: botuser
+      MYSQL_USER: ${MYSQL_USER:-botdbuser}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-botpass}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "3306:3306"  # только для отладки, в проде убрать
+    #  - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    #ports:
+    #  - "3306:3306"  # только для отладки, в проде убрать
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
       interval: 5s
@@ -35,7 +35,7 @@ services:
         condition: service_healthy  # бот стартует ТОЛЬКО после готовности MySQL
     environment:
       # Строка подключения через переменные окружения
-      ConnectionStrings__BotDb: "Server=db;Port=3306;Database=botdb;User=botuser;Password=${MYSQL_PASSWORD:-botpass};SslMode=Disabled;"
+      ConnectionStrings__BotDb: "Server=db;Port=3306;Database=botdb;User=${MYSQL_USER:-botdbuser};Password=${MYSQL_PASSWORD:-botpass};SslMode=Disabled;"
       BotSettings__Token: ${BOT_TOKEN}
       # Таймзона (важно для корректного sent_at)
       TZ: UTC

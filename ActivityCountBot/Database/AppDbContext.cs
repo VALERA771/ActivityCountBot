@@ -14,7 +14,7 @@ public class AppDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            const string connStr = "Server=localhost;Port=3306;Database=botdb;User=root;Password=12Rico34;CharSet=utf8mb4;";
+            const string connStr = "Server=localhost;Port=3306;Database=botdb;User=root;Password=root;CharSet=utf8mb4;";
             optionsBuilder.UseMySql(connStr, ServerVersion.AutoDetect(connStr));
         }
     }
@@ -26,8 +26,6 @@ public class AppDbContext : DbContext
         modelBuilder.HasCharSet("utf8mb4");
         var msg = modelBuilder.Entity<MessageEntry>();
 
-        // Имя таблицы — как в исходном DDL (движок InnoDB и charset utf8mb4_unicode_ci
-        // задаются на уровне сервера/БД либо SQL-скриптом, см. README/database schema).
         msg.ToTable("messages");
 
         msg.HasKey(m => m.Id);
@@ -35,36 +33,35 @@ public class AppDbContext : DbContext
         msg.Property(m => m.Id)
            .HasColumnName("id")
            .HasColumnType("bigint")
-           .ValueGeneratedOnAdd();                 // AUTO_INCREMENT
+           .ValueGeneratedOnAdd();
 
         msg.Property(m => m.ChatId)
            .HasColumnName("chat_id")
            .HasColumnType("bigint")
-           .IsRequired();                          // NOT NULL
+           .IsRequired();
 
         msg.Property(m => m.UserId)
            .HasColumnName("user_id")
            .HasColumnType("bigint")
-           .IsRequired();                          // NOT NULL
+           .IsRequired();
 
         msg.Property(m => m.Username)
            .HasColumnName("username")
            .HasMaxLength(255)
            .HasColumnType("varchar(255)")
-           .IsRequired(false);                     // NULL допустим
+           .IsRequired(false);
 
         msg.Property(m => m.SentAt)
            .HasColumnName("sent_at")
            .HasColumnType("datetime")
-           .IsRequired();                          // NOT NULL
+           .IsRequired();
 
         msg.Property(m => m.CreatedAt)
            .HasColumnName("created_at")
            .HasColumnType("datetime")
-           .HasDefaultValueSql("CURRENT_TIMESTAMP") // DEFAULT CURRENT_TIMESTAMP
-           .ValueGeneratedOnAdd();                  // EF читает значение после INSERT
+           .HasDefaultValueSql("CURRENT_TIMESTAMP")
+           .ValueGeneratedOnAdd();
 
-        // Индексы из DDL.
         msg.HasIndex(m => new { m.ChatId, m.UserId, m.SentAt })
            .HasDatabaseName("idx_messages_stats");
 
