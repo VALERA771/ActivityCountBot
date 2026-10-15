@@ -46,6 +46,10 @@ namespace ActivityCountBot.Migrations
                         .HasColumnType("datetime")
                         .HasColumnName("sent_at");
 
+                    b.Property<int?>("ThreadId")
+                        .HasColumnType("int")
+                        .HasColumnName("thread_id");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");

@@ -38,14 +38,21 @@ public class MessageRepository : IHostedService, IDisposable
         await _channel.Writer.WriteAsync(message, ct);
     }
 
-    public async Task<int> CountAsync(long chatId, long userId, TimeSpan period, CancellationToken ct = default)
+    public async Task<int> CountAsync(long chatId, int? threadId, long userId, TimeSpan period, CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var since = DateTime.UtcNow - period;
 
+        if (threadId == null)
+        {
+            return await db.Messages
+                .Where(m => m.ChatId == chatId && m.UserId == userId && m.SentAt >= since)
+                .CountAsync(ct);
+        }
+
         return await db.Messages
-            .Where(m => m.ChatId == chatId && m.UserId == userId && m.SentAt >= since)
+            .Where(m => m.ChatId == chatId && m.ThreadId == threadId && m.UserId == userId && m.SentAt >= since)
             .CountAsync(ct);
     }
 

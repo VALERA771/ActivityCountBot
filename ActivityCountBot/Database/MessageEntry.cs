@@ -16,6 +16,9 @@ public class MessageEntry
 
     [Column("chat_id", TypeName = "bigint")]
     public long ChatId { get; set; }
+    
+    [Column("thread_id", TypeName = "int")]
+    public int? ThreadId { get; set; }
 
     [Column("user_id", TypeName = "bigint")]
     public long UserId { get; set; }
@@ -32,5 +35,5 @@ public class MessageEntry
     public DateTime CreatedAt { get; set; }
 
     public override string ToString()
-        => $"#{Id} chat={ChatId} user={UserId} (@{Username ?? "?"}) sent={SentAt:O}";
+        => $"#{Id} chat={ChatId} thread={ThreadId?.ToString() ?? "NaN"} user={UserId} (@{Username ?? "?"}) sent={SentAt:O}";
 }

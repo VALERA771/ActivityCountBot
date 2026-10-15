@@ -58,6 +58,7 @@ public class BotHandler
         await _repository.EnqueueAsync(new MessageEntry
         {
             ChatId = message.Chat.Id,
+            ThreadId = message.MessageThreadId,
             UserId = user.Id,
             Username = user.Username,
             SentAt = message.Date.ToUniversalTime()
@@ -69,33 +70,72 @@ public class BotHandler
         User user, 
         CancellationToken cancellationToken)
     {
-        var period = ParsePeriod(message.Text);
+        if (string.IsNullOrEmpty(message.Text))
+            goto invalid_args;
+        
+        var args = message.Text.Split(' ');
+        TimeSpan period;
+        if (args.Length < 1)
+            goto invalid_args;
+        
+        switch (args[0])
+        {
+            case "h":
+                period = TimeSpan.FromHours(1);
+                break;
+            case "d":
+                period = TimeSpan.FromDays(1);
+                break;
+            case "m":
+                period = TimeSpan.FromDays(30);
+                break;
+            case "y":
+                period = TimeSpan.FromDays(365);
+                break;
+            default: goto invalid_args;
+        }
 
-        var count = await _repository.CountAsync(message.Chat.Id, user.Id, period, cancellationToken);
+        var target = user;
+        if (message.ReplyToMessage != null)
+            target = message.ReplyToMessage.From;
+
+        if (target == null)
+        {
+            await _bot.SendMessage(
+                chatId: message.Chat.Id,
+                text: "Неизвестный пользователь.",
+                replyParameters: new() { MessageId = message.MessageId, ChatId = message.Chat.Id },
+                cancellationToken: cancellationToken,
+                ephemeralMessageParameters: new() { ReceiverUserId = user.Id });
+            
+            return;
+        }
+
+        int? threadId = null;
+        if (!(args.Length > 2 && args[1] == "sg") && message.Chat.Type == ChatType.Supergroup)
+            threadId = message.MessageThreadId;
+
+        var count = await _repository.CountAsync(message.Chat.Id, threadId, target.Id, period, cancellationToken);
 
         var periodText = FormatPeriod(period);
-        var userName = user.Username is not null ? $"@{user.Username}" : user.FirstName;
+        var userName = target.Username is not null ? $"@{target.Username}" : target.FirstName;
 
         await _bot.SendMessage(
             chatId: message.Chat.Id,
-            text: $"{userName}, за последние {periodText} ты написал {count} сообщений.",
+            text: $"{userName} за последние {periodText} написал {count} сообщений.",
             replyParameters: new() { MessageId = message.MessageId, ChatId = message.Chat.Id },
-            cancellationToken: cancellationToken);
-    }
-
-    private static TimeSpan ParsePeriod(string? text)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(text ?? "", @"(\d+)(d|mo|h)");
-        if (!match.Success) return TimeSpan.FromDays(7);
-
-        var value = int.Parse(match.Groups[1].Value);
-        return match.Groups[2].Value switch
-        {
-            "h" => TimeSpan.FromHours(value),
-            "d" => TimeSpan.FromDays(value),
-            "mo" => TimeSpan.FromDays(value * 30),
-            _ => TimeSpan.FromDays(7)
-        };
+            cancellationToken: cancellationToken,
+            disableNotification: true);
+        return;
+        
+        invalid_args:
+        await _bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: "Указано неверное кол-во параметров: используйте /stats [h/d/m/y] [sg].\n" +
+                  "Для просмотра статистики конкретного пользователя отправьте команду ответом на сообщение этого пользователя",
+            replyParameters: new() { MessageId = message.MessageId, ChatId = message.Chat.Id },
+            cancellationToken: cancellationToken,
+            ephemeralMessageParameters: new() { ReceiverUserId = user.Id });
     }
 
     private static string FormatPeriod(TimeSpan ts)
